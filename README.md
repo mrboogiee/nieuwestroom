@@ -1,7 +1,7 @@
 # Nieuwestroom Custom Component voor Home Assistant
 Middels deze integratie wordt de huidige prijsinformatie van Nieuwestroom beschikbaar gemaakt binnen Home Assistant.
 
-Deze integratie (inclusief deze readme) is zwaar "geinspireerd" door de [Frank Energie custom component](https://github.com/bajansen/home-assistant-frank_energie) van @bajansen.
+Deze integratie (inclusief deze readme) is zwaar "geinspireerd" door de [Frank Energie custom component](https://github.com/bajansen/home-assistant-frank_energie) van [@bajansen](https://github.com/bajansen).
 
 De waarden van de prijssensoren kunnen bijvoorbeeld gebruikt worden om apparatuur te schakelen op basis van de huidige energieprijs.
 

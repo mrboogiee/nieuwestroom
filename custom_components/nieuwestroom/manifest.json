@@ -1,0 +1,16 @@
+{
+    "domain": "nieuwestroom",
+    "name": "nieuwestroom",
+    "config_flow": true,
+    "documentation": "https://www.home-assistant.io/integrations/nieuwestroom",
+    "requirements": [],
+    "ssdp": [],
+    "zeroconf": [],
+    "homekit": {},
+    "dependencies": [],
+    "codeowners": [
+        "@MrBoogiee"
+    ],
+    "iot_class": "cloud_polling",
+    "version": "0.0.1"
+}

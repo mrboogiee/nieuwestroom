@@ -21,6 +21,7 @@ from homeassistant.const import (
     CONF_DISPLAY_OPTIONS,
     CURRENCY_EURO,
     ENERGY_KILO_WATT_HOUR,
+    VOLUME_CUBIC_METERS,
     # VOLUME_CUBIC_METERS,
 )
 
@@ -38,7 +39,8 @@ from homeassistant.util import dt, utcnow
 
 ATTRIBUTION = "Data provided by easyenergy.com"
 DOMAIN = "nieuwestroom"
-DATA_URL = "https://mijn.easyenergy.com/nl/api/tariff/getapxtariffs?startTimestamp="
+ELEC_DATA_URL = "https://mijn.easyenergy.com/nl/api/tariff/getapxtariffs?startTimestamp="
+GAS_DATA_URL = "https://mijn.easyenergy.com/nl/api/tariff/getlebatariffs?startTimestamp=" #2022-09-08T22%3A00%3A00.000Z&endTimestamp=2022-09-09T22%3A00%3A00.000Z&grouping=&includeVat=false"
 ICON = "mdi:currency-eur"
 
 
@@ -56,12 +58,6 @@ SENSOR_TYPES: tuple[NieuwestroomEntityDescription, ...] = (
         native_unit_of_measurement=f"{CURRENCY_EURO}/{ENERGY_KILO_WATT_HOUR}",
         value_fn=lambda data: data["elec"][0],
     ),
-    # NieuwestroomEntityDescription(
-    #     key="gas_market",
-    #     name="Current gas market price",
-    #     native_unit_of_measurement=f"{CURRENCY_EURO}/{VOLUME_CUBIC_METERS}",
-    #     value_fn=lambda data: data["gas"][0],
-    # ),
     NieuwestroomEntityDescription(
         key="elec_min",
         name="Lowest energy price for 24h",
@@ -81,6 +77,24 @@ SENSOR_TYPES: tuple[NieuwestroomEntityDescription, ...] = (
         value_fn=lambda data: round(
             sum(data["today_elec"]) / len(data["today_elec"]), 5
         ),
+    ),
+    NieuwestroomEntityDescription(
+        key="gas_market",
+        name="Current gas market price",
+        native_unit_of_measurement=f"{CURRENCY_EURO}/{VOLUME_CUBIC_METERS}",
+        value_fn=lambda data: data['gas'][0],
+    ),
+    NieuwestroomEntityDescription(
+        key="gas_min",
+        name="Lowest gas price today",
+        native_unit_of_measurement=f"{CURRENCY_EURO}/{VOLUME_CUBIC_METERS}",
+        value_fn=lambda data: min(data['today_gas']),
+    ),
+    NieuwestroomEntityDescription(
+        key="gas_max",
+        name="Highest gas price today",
+        native_unit_of_measurement=f"{CURRENCY_EURO}/{VOLUME_CUBIC_METERS}",
+        value_fn=lambda data: max(data['today_gas']),
     ),
 )
 
@@ -190,19 +204,20 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
 
         # Fetch data for today and tomorrow separately,
         # because the gas prices response only contains data for the first day of the query
-        data_today = await self._run_electricity_query(today, tomorrow)
+        elec_data_today = await self._run_electricity_query(today, tomorrow)
+        gas_data_today = await self._run_gas_query(today, tomorrow)
         # data_tomorrow = await self._run_electricity_query(tomorrow, day_after_tomorrow)
         return {
-            "marketPricesElectricity": data_today,
+            "marketPricesElectricity": elec_data_today,
             # + data_tomorrow["TariffUsage"],
-            # "marketPricesGas": data_today["marketPricesGas"]
+            "marketPricesGas": gas_data_today
             # + data_tomorrow["marketPricesGas"],
         }
 
     async def _run_electricity_query(self, start_date, end_date):
         try:
             full_url = (
-                DATA_URL
+                ELEC_DATA_URL
                 + str(start_date.year)
                 + "-"
                 + str("{:02d}".format(start_date.month))
@@ -228,14 +243,42 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
             raise UpdateFailed(
                 f"Fetching energy data failed: {error}") from error
 
+    async def _run_gas_query(self, start_date, end_date):
+        try:
+            full_url = (
+                GAS_DATA_URL
+                + str(start_date.year)
+                + "-"
+                + str("{:02d}".format(start_date.month))
+                + "-"
+                + str("{:02d}".format(start_date.day))
+                + "T"
+                + str("{:02d}".format(start_date.hour))
+                + "%3A00%3A00.000Z&endTimestamp="
+                + str(end_date.year)
+                + "-"
+                + str("{:02d}".format(end_date.month))
+                + "-"
+                + str("{:02d}".format(end_date.day))
+                + "T"
+                + str("{:02d}".format(end_date.hour))
+                + "%3A00%3A00.000Z&grouping=&includeVat=false"
+            )
+            resp = await self.websession.get(full_url)
+            data = await resp.json()
+            return data
+
+        except (asyncio.TimeoutError, aiohttp.ClientError, KeyError) as error:
+            raise UpdateFailed(
+                f"Fetching gas data failed: {error}") from error
+
     def processed_data(self):
         """supposed to process the data into usable data"""
         return {
             "elec": self.get_current_hourprices(self.data["marketPricesElectricity"]),
-            # ,
-            "today_elec": self.get_hourprices(self.data["marketPricesElectricity"])
-            # 'gas': self.get_current_hourprices(self.data['marketPricesGas']),
-            # 'today_gas': self.get_hourprices(self.data['marketPricesGas'])
+            'gas': self.get_current_gas_hourprices(self.data['marketPricesGas']),
+            "today_elec": self.get_elec_hourprices(self.data["marketPricesElectricity"]),
+            'today_gas': self.get_gas_hourprices(self.data['marketPricesGas']),
         }
 
     def get_current_hourprices(self, hourprices) -> tuple:
@@ -246,7 +289,22 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
             ):
                 return (hour["TariffUsage"],)
 
-    def get_hourprices(self, hourprices) -> list:
+    def get_elec_hourprices(self, hourprices) -> list:
+        """create a list of hourly rates"""
+        today_prices = []
+        for hour in hourprices:
+            today_prices.append(hour["TariffUsage"])
+        return today_prices
+    
+    def get_current_gas_hourprices(self, hourprices) -> tuple:
+        """get the current hourly pricing"""
+        for hour in hourprices:
+            if dt.parse_datetime(hour["Timestamp"]) == dt.utcnow().replace(
+                minute=0, second=0, microsecond=0
+            ):
+                return (hour["TariffUsage"],)
+
+    def get_gas_hourprices(self, hourprices) -> list:
         """create a list of hourly rates"""
         today_prices = []
         for hour in hourprices:

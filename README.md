@@ -25,4 +25,7 @@ sensor:
       - elec_min
       - elec_max
       - elec_avg
+      - gas_market
+      - gas_min
+      - gas_max
 ```

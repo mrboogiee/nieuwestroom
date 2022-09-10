@@ -147,7 +147,7 @@ class NieuwestroomSensor(CoordinatorEntity, SensorEntity):
         self.entity_description: NieuwestroomEntityDescription = description
         self._attr_unique_id = f"nieuwestroom.{description.key}"
 
-        self._update_job = HassJob(self.async_schedule_update_ha_state)
+        self._update_job = HassJob(self.async_schedule_update_ha_state(force_refresh=False))
         self._unsub_update = None
 
         super().__init__(coordinator)
@@ -174,8 +174,6 @@ class NieuwestroomSensor(CoordinatorEntity, SensorEntity):
             # utcnow().replace(minute=0, second=0) + timedelta(hours=1),
             utcnow().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1),
         )
-
-
 class NieuwestroomCoordinator(DataUpdateCoordinator):
     """Get the latest data and update the states."""
 

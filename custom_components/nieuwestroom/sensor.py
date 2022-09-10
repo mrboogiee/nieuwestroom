@@ -147,7 +147,7 @@ class NieuwestroomSensor(CoordinatorEntity, SensorEntity):
         self.entity_description: NieuwestroomEntityDescription = description
         self._attr_unique_id = f"nieuwestroom.{description.key}"
 
-        self._update_job = HassJob(self.async_schedule_update_ha_state(force_refresh=False))
+        self._update_job = HassJob(self.async_schedule_update_ha_state(force_refresh=True))
         self._unsub_update = None
 
         super().__init__(coordinator)

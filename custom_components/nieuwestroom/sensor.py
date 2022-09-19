@@ -153,6 +153,7 @@ class NieuwestroomSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
 
     async def async_update(self) -> None:
+        _LOGGER.debug("async_update")
         """Get the latest data and updates the states."""
         try:
             self._attr_native_value = self.entity_description.value_fn(
@@ -213,6 +214,7 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
         }
 
     async def _run_electricity_query(self, start_date, end_date):
+        _LOGGER.debug("_run_electricity_query")
         try:
             full_url = (
                 ELEC_DATA_URL
@@ -233,6 +235,7 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
                 + str("{:02d}".format(end_date.hour))
                 + "%3A00%3A00.000Z&grouping=&includeVat=false"
             )
+            _LOGGER.debug(full_url)
             resp = await self.websession.get(full_url)
             data = await resp.json()
             return data
@@ -242,6 +245,7 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
                 f"Fetching energy data failed: {error}") from error
 
     async def _run_gas_query(self, start_date, end_date):
+        _LOGGER.debug("_run_gas_query")
         try:
             full_url = (
                 GAS_DATA_URL
@@ -262,6 +266,7 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
                 + str("{:02d}".format(end_date.hour))
                 + "%3A00%3A00.000Z&grouping=&includeVat=false"
             )
+            _LOGGER.debug(full_url)
             resp = await self.websession.get(full_url)
             data = await resp.json()
             return data
@@ -272,6 +277,7 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
 
     def processed_data(self):
         """supposed to process the data into usable data"""
+        _LOGGER.debug("Starting processed_data(self)")
         return {
             "elec": self.get_current_hourprices(self.data["marketPricesElectricity"]),
             'gas': self.get_current_gas_hourprices(self.data['marketPricesGas']),
@@ -280,6 +286,7 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
         }
 
     def get_current_hourprices(self, hourprices) -> tuple:
+        _LOGGER.debug("get_current_hourprices)")
         """get the current hourly pricing"""
         for hour in hourprices:
             if dt.parse_datetime(hour["Timestamp"]) == dt.utcnow().replace(
@@ -288,6 +295,7 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
                 return (hour["TariffUsage"],)
 
     def get_elec_hourprices(self, hourprices) -> list:
+        _LOGGER.debug("get_elec_hourprices")
         """create a list of hourly rates"""
         today_prices = []
         for hour in hourprices:
@@ -295,6 +303,7 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
         return today_prices
     
     def get_current_gas_hourprices(self, hourprices) -> tuple:
+        _LOGGER.debug("get_current_gas_hourprices")
         """get the current hourly pricing"""
         for hour in hourprices:
             if dt.parse_datetime(hour["Timestamp"]) == dt.utcnow().replace(
@@ -303,6 +312,7 @@ class NieuwestroomCoordinator(DataUpdateCoordinator):
                 return (hour["TariffUsage"],)
 
     def get_gas_hourprices(self, hourprices) -> list:
+        _LOGGER.debug("get_gas_hourprices")
         """create a list of hourly rates"""
         today_prices = []
         for hour in hourprices:
